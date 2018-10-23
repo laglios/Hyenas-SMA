@@ -1,10 +1,24 @@
-globals[lair-x lair-y spd-walk spd-run]
+globals[lair-x lair-y spd-walk spd-run global-hunger]
 patches-own [ground savane water rocky lair
-cpt-temps timer1 timer2]
+  meat
+  timer1 timer2]
+
+;;--------------------------
+;;---Hyanas inner working---
+;;--------------------------
 breed[hyenas hyena]
-hyenas-own [rank strenght hunger]
+hyenas-own [age rank strength hunger pre
+timer1 timer2 timer-R]
 
+;;-----------------
+;;---Other breed---
+;;-----------------
+breed [preys prey]
+breed [predators predator]
 
+;;-------------------
+;;-------INIT--------
+;;-------------------
 to setup
   ;; (for this model to work with NetLogo's new plotting features,
   ;; __clear-all-and-reset-ticks should be replaced with clear-all at
@@ -31,9 +45,9 @@ to setup
   ask patches [display-ground ]
 end
 
-
+;;---------------------------------------------------------
 ;;-------------------init and display----------------------
-
+;;---------------------------------------------------------
 to init-water
   let continue 1
   while [continue = 1][
@@ -50,7 +64,6 @@ to init-water
           if(in-map xxx yyy)
           [ask patch xxx yyy [set water 100 + random 200]]
         ]
-
       ]
     ]
   ]
@@ -136,27 +149,35 @@ to init-hyenas
   ]
 end
 
+;;-------------------------------------------------------------
 ;;---------------------GO and timed events---------------------
+;;-------------------------------------------------------------
 to go
   ask hyenas [IA-hyenas]
 end
 
+;;---------------------------------------------------
 ;;---------------------IA Hyanas---------------------
+;;---------------------------------------------------
 to IA-hyenas
   rt random 45
   lt random 45
   fd spd-walk
 end
 
+;;---------------------------------------------------
 ;;---------------------IA Others---------------------
+;;---------------------------------------------------
 
+;;-----------------------------------------------
 ;;---------------------Tools---------------------
+;;-----------------------------------------------
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
 10
-1020
-501
+1022
+503
 -1
 -1
 2.0

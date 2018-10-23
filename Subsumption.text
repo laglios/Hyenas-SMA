@@ -1,0 +1,67 @@
+Hyènes :
+
+Haute Priorité
+^
+|--Evitement (Variable)
+|
+|--Interraction Lion
+|
+|--Defendre
+|
+|--Nourrir / Manger : Si hyenas with [hunger > seuil-hunger and rang > self.rang]
+|
+|--Chasse / Recherche
+|
+|--Nourrir Petit
+|
+|--Reproduction
+|
+|--Détente
+v
+Basse priorité
+
+
+Bébé hyènes :
+
+Haute Priorité
+^
+|-Se protéger / Fuir - Converge vers le centre
+|
+|-Rester dans tanière
+|
+|-Se Nourrir
+|
+|-Jouer
+v
+Basse priorité
+
+
+Proie :
+
+Haute Priorité
+^
+|-Evitement
+|
+|-Fuite
+|
+|-Boire
+|
+|-Manger (arrêt)
+|
+|-Flock basique
+v
+Basse priorité
+
+Lion :
+
+Haute Priorité
+^
+|-Fuir groupe de Hyènes
+|
+|-Chasser Hyènes
+|
+|-Chasser Proie
+|
+|-Chercher
+v
+Basse priorité
