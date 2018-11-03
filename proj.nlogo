@@ -1,19 +1,22 @@
-globals[lair-x lair-y spd-walk spd-run global-hunger]
-patches-own [ground savane water rocky lair
-  meat
-  timer1 timer2]
+globals[lair-x lair-y spd-walk spd-run global-hunger feeding-rate
+  timer-body
+  max-angle-turn vision];;flocking var
+patches-own [ground savane water rocky lair meat
+  timerp-1 timerp-2]
 
 ;;--------------------------
 ;;---Hyanas inner working---
 ;;--------------------------
 breed[hyenas hyena]
-hyenas-own [age rank strength hunger target
-timer1 timer2 timer-R]
+hyenas-own [age rank strength hunger target t-called heat life
+  timer1 timer2 timer-R timer-att
+  debug]
 
 ;;-----------------
 ;;---Other breed---
 ;;-----------------
 breed [preys prey]
+preys-own [thirt flockmates nearest-neighbor life panic]
 breed [predators predator]
 
 ;;-------------------
@@ -28,6 +31,7 @@ to setup
   ;;----init globals----
   set spd-walk 0.1
   set spd-run 0.3
+  set feeding-rate 0.005
 
   ;;----init world----
   repeat nb-water [init-water]
@@ -40,14 +44,86 @@ to setup
   create-hyenas nb-hyenas [
     init-hyenas
   ]
+  create-hyenas 1[
+   init-matriach
+  ]
+  ;;-----init preys-----
+  repeat initial-prey[
+    let xx random-xcor
+    let yy random-ycor
+    create-preys 5 + random 10[
+      init-prey xx yy
+    ]
+  ]
 
   ;;----init display world----
   ask patches [display-ground ]
+
+  ;;---init flock---
+ set max-angle-turn 124
+ ;; set factor-align 0.4
+ ;; set factor-cohere 0.1
+ ;; set factor-separate 0.0
+  set vision 20
 end
 
 ;;---------------------------------------------------------
 ;;-------------------init and display----------------------
 ;;---------------------------------------------------------
+
+to init-hyenas
+  set shape "wolf 7"
+  set hunger 60 + random 40
+  set life 100
+  set age 1
+  set rank random 5
+  set strength 10 + random 50
+  set size 4 - (2 - (strength / 60) * 2)
+  ifelse rank = 0 [set color blue][set color pink]
+  let continue 1
+  set target nobody
+  while[continue = 1][
+    let xx lair-x + random 10 - random 10
+    let yy lair-y + random 10 - random 10
+    if(in-map xx yy)[
+     setxy xx yy
+     set continue 0
+    ]
+  ]
+end
+
+to init-matriach
+  set color red
+  set shape "wolf 7"
+  set size 3
+  set hunger 100
+  set life 100
+  set age 1
+  set rank 5
+  set strength 60
+  set size 4
+  set target nobody
+  setxy lair-x lair-y
+end
+
+to init-prey [xxx yyy]
+  set color grey
+  set shape "moose"
+  set thirt 100
+  set size 5
+  set panic 0
+  set life 100
+  let continue 1
+  while[continue = 1][
+    let xx xxx + random 10 - random 10
+    let yy yyy + random 10 - random 10
+    if([water] of patch xx yy < 0.5)[
+     setxy xx yy
+     set continue 0
+    ]
+  ]
+end
+
 to init-water
   let continue 1
   while [continue = 1][
@@ -118,66 +194,320 @@ to init-lair
 end
 
 to display-ground
-  ifelse(lair > 0.2) [
-   set pcolor scale-color brown lair  0 1
-  ]
-  [ifelse(water > 0.2) [
-    let w water
-    if (w > 50) [set w 50]
-    set pcolor scale-color blue water 1.5 -1
+  ifelse(meat = 0)[
+    ifelse(lair > 0.2) [
+    set pcolor scale-color brown lair  0 1
     ]
-    [
-      let colors [114 69 0]
-      set pcolor scale-color brown savane  0 200
+    [ifelse(water > 0.2) [
+      let w water
+      if (w > 50) [set w 50]
+      set pcolor scale-color blue water 1.5 -1
+      ]
+      [
+        let colors [114 69 0]
+        set pcolor scale-color brown savane  0 200
+      ]
     ]
-  ]
-
+  ];;end if no meat
+  [set pcolor red];;end if meat
 end
 
-to init-hyenas
-  set color pink
-  set shape "wolf 7"
-  set size 3
-  let continue 1
-  while[continue = 1][
-    let xx lair-x + random 10 - random 10
-    let yy lair-y + random 10 - random 10
-    if(in-map xx yy)[
-     setxy xx yy
-     set continue 0
-    ]
-  ]
-end
+
 
 ;;-------------------------------------------------------------
 ;;---------------------GO and timed events---------------------
 ;;-------------------------------------------------------------
 to go
   ask hyenas [IA-hyenas]
+  ask preys [IA-preys]
+  ask preys [rt random 90 lt random 90 fd spd-walk]
+  if(count hyenas > 0)[
+    set global-hunger mean [hunger] of hyenas
+  ]
+  ;;corpse-generator
+
+  update-plots
+end
+
+to corpse-generator
+  ifelse(timer-body = 0)[
+    ask patch random-xcor random-ycor [set meat 25 display-ground]
+    set timer-body 300 + random 600
+  ]
+  [set timer-body timer-body - 1  ]
 end
 
 ;;---------------------------------------------------
 ;;---------------------IA Hyanas---------------------
 ;;---------------------------------------------------
+
 to IA-hyenas
-  rt random 45
-  lt random 45
+  let surrounding count predators in-radius 10
+  ifelse surrounding > 0 [predator-interract surrounding]
+  [ifelse t-called = 1 [defend-territory]
+    [set surrounding min-one-of patches in-radius 10 with [meat > 0] [distance myself]
+      ifelse (surrounding != nobody) [eat-meat surrounding]
+      [ifelse (hunger < 30 or global-hunger < hunger-seuil) [hunt]
+        [set surrounding min-one-of hyenas in-radius 5 with [age = 0] [distance myself]
+          ifelse surrounding != nobody [feed surrounding]
+          [ifelse heat > heat-seuil [reproduce]
+            [frolic];;end reproduce
+          ];;end feed children
+        ];;end hunt
+      ];;end eat meat
+    ];;end defend
+  ];;end predator
+  update-hyenas
+end
+
+to update-hyenas
+  set hunger hunger - feeding-rate
+  set heat heat + feeding-rate
+  ifelse(timer-att > 0)[set timer-att timer-att - 1]
+  [set timer-att 0]
+  if hunger < 1 [set life life - 1]
+end
+
+to predator-interract [surronding]
+  set debug "predator-interact"
+end
+
+to defend-territory
+  set debug "defend"
+end
+
+to eat-meat [surrounding] ;;hierarchi order
+
+end
+
+to hunt
+  set debug "hunt"
+  ifelse target = nobody [ ;; no previous target
+    set target min-one-of preys in-radius 10 [distance myself]
+    ifelse(target != nobody)[;;target found
+      let number count preys in-radius 15
+      ifelse(number > 3)[ ;; if in pack
+        ifelse(distance target > 7)[;; if too far
+          face target fd spd-walk
+        ][;; if too close
+          face target rt 180 fd spd-walk
+        ]
+      ][;;if alone
+        face target fd spd-run
+      ]
+    ][;;no target
+      rt random 15
+      lt random 15
+      fd spd-walk
+    ]
+  ][;;follow previous target
+    ifelse((distance target) < 2.5) [;;in reach to attack
+      if(timer-att = 0)[
+        ask target [ set life life - [strength] of myself]
+      ]
+    ][;;if too far
+      set target min-one-of preys in-radius 15 [distance myself]
+      let number count preys in-radius 15
+      ifelse(number > 3)[ ;; if in pack
+        ifelse(distance target > 13)[;; if too far
+          face target fd spd-walk
+        ][;; if too close
+          let nei min-one-of other hyenas in-radius 5 [distance myself] ;;neighbor
+          ifelse(nei != nobody)[;;if ally close
+            face nei rt 180 fd spd-walk
+          ][;;if close and no ally
+            face target rt 90 fd spd-walk
+          ]
+        ]
+      ][;;if alone
+        face target fd spd-run
+      ]
+    ]
+  ]
+end
+
+to feed [surronding]
+  set debug "feed children"
+end
+
+to reproduce
+  set debug "repoduce"
+end
+
+to frolic
+  set debug "frolic"
+  ifelse (distance patch lair-x lair-y < 40)
+  [ rt random 45
+    lt random 45
+  ]
+  [face patch lair-x lair-y
+    rt random 90
+    lt random 90
+  ]
   fd spd-walk
 end
 
 ;;---------------------------------------------------
 ;;---------------------IA Others---------------------
 ;;---------------------------------------------------
+to IA-preyss
+  rt random 45
+  lt random 45
+  let terrain patch-ahead spd-walk
+  if(terrain != nobody and [water] of terrain < 0.5)[
+    fd spd-walk
+  ]
+  update-preys
+end
+
+to update-preys
+  set thirt thirt - feeding-rate
+  if(life < 1)[
+    ask patch xcor ycor [set meat 60 display-ground] die
+  ]
+end
+
+to IA-preys
+  flock
+  update-preys
+end
+
+to flock  ;; turtle procedure
+  find-flockmates
+  if any? flockmates
+  [let a angleFromVect vectDirect
+    turn-towards a max-angle-turn]
+end
+
+;;----------------------------------------------------
+;;---------------------Debug/Test---------------------
+;;----------------------------------------------------
+
+to erase-hyenas
+  ask hyenas[die]
+end
+
+to spawn-hyenas
+  create-hyenas nb-hyenas [
+    init-hyenas
+  ]
+  create-hyenas 1[
+   init-matriach
+  ]
+end
 
 ;;-----------------------------------------------
 ;;---------------------Tools---------------------
 ;;-----------------------------------------------
+to-report angleFromVect [vect]
+    let a atan item 1  vect item 0 vect
+    report a
+end
+
+to-report vectDirect
+  let va multiplyScalarvect (factor-align * 4) vectAlign
+  let vs multiplyScalarvect factor-separate vectSeparate
+  let vc multiplyScalarvect (factor-cohere * 4) vectCohere
+
+  let vr additionvect va vc
+  set vr additionvect vr vs
+  report vr
+;
+end
+
+to find-flockmates  ;; turtle procedure
+  set flockmates other preys in-radius vision
+end
+
+to find-nearest-neighbor ;; turtle procedure
+  set nearest-neighbor min-one-of flockmates with [xcor != [xcor] of myself and ycor != [ycor] of myself] [distance myself]
+end
+
+;;; SEPARATE
+
+
+to-report vectSeparate
+  let vs 0
+  find-nearest-neighbor
+  ifelse (nearest-neighbor = nobody)
+     ; [set vs VectFromAngle random 180 0]
+      [set vs list 0 0]
+      [set vs VectFromAngle (towards nearest-neighbor + 180 ) (1 / distance nearest-neighbor)]
+  report vs
+end
+
+;to separate  ;; turtle procedure
+;  turn-away ([heading] of nearest-neighbor) max-separate-turn
+;end
+
+;;; ALIGN
+
+to-report vectAlign
+  let x-component sum [dx] of flockmates
+  let y-component sum [dy] of flockmates
+  report (list x-component y-component)
+end
+
+;to align  ;; turtle procedure
+;  turn-towards average-flockmate-heading max-align-turn
+;end
+
+;to-report average-flockmate-heading  ;; turtle procedure
+;  ;; We can't just average the heading variables here.
+;  ;; For example, the average of 1 and 359 should be 0,
+;  ;; not 180.  So we have to use trigonometry.
+;  let x-component sum [dx] of flockmates
+;  let y-component sum [dy] of flockmates
+;  ifelse x-component = 0 and y-component = 0
+;    [ report heading ]
+;    [ report atan x-component y-component ]
+;end
+
+;;; COHERE
+
+to-report vectCohere
+
+  let x-component mean [sin (towards myself + 180)] of flockmates
+  let y-component mean [cos (towards myself + 180)] of flockmates
+  report (list x-component y-component)
+end
+
+;;; HELPER PROCEDURES
+
+to turn-towards [new-heading max-turn]  ;; turtle procedure
+  turn-at-most (subtract-headings new-heading heading) max-turn
+end
+
+to turn-away [new-heading max-turn]  ;; turtle procedure
+  turn-at-most (subtract-headings heading new-heading) max-turn
+end
+
+;; turn right by "turn" degrees (or left if "turn" is negative),
+;; but never turn more than "max-turn" degrees
+to turn-at-most [turn max-turn]  ;; turtle procedure
+  ifelse abs turn > max-turn
+    [ ifelse turn > 0
+        [ rt max-turn ]
+        [ lt max-turn ] ]
+    [ rt turn ]
+end
+
+to-report multiplyScalarvect [factor vect]
+   report (list (item 0 vect * factor) (item 1 vect * factor))
+end
+to-report additionvect [v1 v2]
+   report (list (item 0 v1 + item 0 v2) (item 1 v1 + item 1 v2) )
+end
+to-report vectFromAngle [angle len]
+   let l (list (len * cos angle) (len * sin angle))
+   report l
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
 10
-1022
-503
+1020
+501
 -1
 -1
 2.0
@@ -187,8 +517,8 @@ GRAPHICS-WINDOW
 1
 1
 0
-0
-0
+1
+1
 1
 -200
 200
@@ -226,7 +556,7 @@ nb-hyenas
 nb-hyenas
 0
 30
-30.0
+12.0
 1
 1
 NIL
@@ -241,7 +571,7 @@ nb-water
 nb-water
 1
 10
-10.0
+8.0
 1
 1
 NIL
@@ -263,6 +593,148 @@ NIL
 NIL
 NIL
 1
+
+SLIDER
+5
+201
+177
+234
+hunger-seuil
+hunger-seuil
+0
+100
+50.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+3
+237
+175
+270
+heat-seuil
+heat-seuil
+0
+100
+50.0
+1
+1
+NIL
+HORIZONTAL
+
+BUTTON
+1035
+15
+1143
+48
+NIL
+erase-hyenas
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+1145
+15
+1257
+48
+NIL
+spawn-hyenas\n
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+SLIDER
+84
+45
+117
+195
+initial-prey
+initial-prey
+0
+4
+3.0
+1
+1
+NIL
+VERTICAL
+
+SLIDER
+1036
+59
+1208
+92
+factor-align
+factor-align
+0
+1
+1.0
+0.1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+1035
+95
+1207
+128
+factor-cohere
+factor-cohere
+0
+1
+0.0
+0.1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+1036
+131
+1208
+164
+factor-separate
+factor-separate
+-1
+1
+0.3
+0.1
+1
+NIL
+HORIZONTAL
+
+PLOT
+1033
+247
+1233
+397
+Global Hunger
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -16777216 true "" "plot global-hunger"
 
 @#$#@#$#@
 ## WHAT IS IT?
@@ -466,6 +938,16 @@ line half
 true
 0
 Line -7500403 true 150 0 150 150
+
+moose
+false
+0
+Polygon -7500403 true true 196 228 198 297 180 297 178 244 166 213 136 213 106 213 79 227 73 259 50 257 49 229 38 197 26 168 26 137 46 120 101 122 147 102 181 111 217 121 256 136 294 151 286 169 256 169 241 198 211 188
+Polygon -7500403 true true 74 258 87 299 63 297 49 256
+Polygon -7500403 true true 25 135 15 186 10 200 23 217 25 188 35 141
+Polygon -7500403 true true 270 150 253 100 231 94 213 100 208 135
+Polygon -7500403 true true 225 120 204 66 207 29 185 56 178 27 171 59 150 45 165 90
+Polygon -7500403 true true 225 120 249 61 241 31 265 56 272 27 280 59 300 45 285 90
 
 pentagon
 false
