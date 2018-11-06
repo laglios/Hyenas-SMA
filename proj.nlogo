@@ -8,9 +8,10 @@ patches-own [ground savane water rocky lair meat
 ;;---Hyanas inner working---
 ;;--------------------------
 breed[hyenas hyena]
-hyenas-own [age rank strength hunger target t-called heat life
+hyenas-own [debug
+  age rank strength hunger target t-called m-called heat life
   timer1 timer2 timer-R timer-att
-  debug]
+]
 
 ;;-----------------
 ;;---Other breed---
@@ -79,6 +80,7 @@ to init-hyenas
   set rank random 5
   set strength 10 + random 50
   set size 4 - (2 - (strength / 60) * 2)
+  set m-called nobody
   ifelse rank = 0 [set color blue][set color pink]
   let continue 1
   set target nobody
@@ -102,6 +104,7 @@ to init-matriach
   set rank 5
   set strength 60
   set size 4
+  set m-called nobody
   set target nobody
   setxy lair-x lair-y
 end
@@ -119,7 +122,9 @@ to init-prey [xxx yyy]
     let yy yyy + random 10 - random 10
     if([water] of patch xx yy < 0.5)[
      setxy xx yy
-     set continue 0
+      let test min-one-of other preys in-radius 0 [distance myself]
+      if(test != nobody)[face test rt 180 lt random 25 rt random 25 fd spd-walk]
+      set continue 0
     ]
   ]
 end
@@ -245,9 +250,9 @@ to IA-hyenas
   let surrounding count predators in-radius 10
   ifelse surrounding > 0 [predator-interract surrounding]
   [ifelse t-called = 1 [defend-territory]
-    [set surrounding min-one-of patches in-radius 10 with [meat > 0] [distance myself]
-      ifelse (surrounding != nobody) [eat-meat surrounding]
-      [ifelse (hunger < 30 or global-hunger < hunger-seuil) [hunt]
+    [if(m-called = nobody) [set m-called min-one-of patches in-radius 10 with [meat > 0] [distance myself]]
+      ifelse (hunger < hunger-seuil - 20 and m-called != nobody)[eat-meat]
+      [ifelse (hunger < hunger-seuil - 20 or global-hunger < hunger-seuil) [hunt]
         [set surrounding min-one-of hyenas in-radius 5 with [age = 0] [distance myself]
           ifelse surrounding != nobody [feed surrounding]
           [ifelse heat > heat-seuil [reproduce]
@@ -276,7 +281,25 @@ to defend-territory
   set debug "defend"
 end
 
-to eat-meat [surrounding] ;;hierarchi order
+to eat-meat ;;hierarchi order
+  ifelse (([meat] of m-called) = 0) [set debug "no" set m-called nobody]
+  [;;if there is still meat
+    let yippy m-called
+    ask hyenas [if m-called = nobody [set m-called yippy] ]
+    ifelse(distance m-called < 1)[;;close test
+      set debug "eating"
+      let surrounding count other hyenas in-radius 10 with [hunger < hunger-seuil and rank > [rank] of myself and strength > [strength] of myself]
+      ifelse surrounding < 1[
+        ask m-called [ set meat meat - 5 if(meat < 1) [set meat 0 display-ground]]
+        set hunger hunger + 5
+      ][;;wait in line
+        fiddle
+      ]
+    ][;; if too far
+      set debug "closing distance"
+      face m-called fd spd-walk
+    ]
+  ]
 
 end
 
@@ -345,6 +368,11 @@ to frolic
     lt random 90
   ]
   fd spd-walk
+end
+
+to fiddle
+  rt random 180
+  lt random 180
 end
 
 ;;---------------------------------------------------
@@ -603,7 +631,7 @@ hunger-seuil
 hunger-seuil
 0
 100
-50.0
+100.0
 1
 1
 NIL
