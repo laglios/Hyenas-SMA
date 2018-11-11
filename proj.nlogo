@@ -17,7 +17,7 @@ hyenas-own [debug
 ;;---Other breed---
 ;;-----------------
 breed [preys prey]
-preys-own [thirt flockmates nearest-neighbor life panic]
+preys-own [thirt flockmates obstacles nearest-neighbor life panic dangers]
 breed [predators predator]
 
 ;;-------------------
@@ -378,35 +378,55 @@ end
 ;;---------------------------------------------------
 ;;---------------------IA Others---------------------
 ;;---------------------------------------------------
-to IA-preyss
-  rt random 45
-  lt random 45
-  let terrain patch-ahead spd-walk
-  if(terrain != nobody and [water] of terrain < 0.5)[
-    fd spd-walk
-  ]
-  update-preys
+
+to find-obstacles
+  set obstacles patches in-cone 9 60 with [water > 0.1]
+end
+
+to find-predators
+  set dangers hyenas in-cone 9 60
 end
 
 to update-preys
+  find-obstacles
+  find-predators
   set thirt thirt - feeding-rate
   if(life < 1)[
     ask patch xcor ycor [set meat 60 display-ground] die
   ]
 end
 
+to flee
+  if any? dangers
+  [
+    let d min-one-of dangers [distance myself]
+    face d
+    rt 180
+    fd spd-run
+  ]
+end
+
 to IA-preys
+  find-predators
+  flee
   flock
   update-preys
 end
 
-to flock  ;; turtle procedure
+to flock
   find-flockmates
-  if any? flockmates
-  [let a angleFromVect vectDirect
-    turn-towards a max-angle-turn]
+  find-obstacles
+  find-predators
+  ifelse any? flockmates
+  [let  v  vectDirect
+    let a angleFromVect v
+    turn-towards a max-angle-turn
+  ]
+  [ let v vectWithObstacles
+    let a angleFromVect v
+    turn-towards a max-angle-turn
+  ]
 end
-
 ;;----------------------------------------------------
 ;;---------------------Debug/Test---------------------
 ;;----------------------------------------------------
@@ -428,17 +448,24 @@ end
 ;;---------------------Tools---------------------
 ;;-----------------------------------------------
 to-report angleFromVect [vect]
-    let a atan item 1  vect item 0 vect
+    ifelse ((item 0 vect = 0) and (item 1 vect = 0))[
+    report 0
+  ][
+    let a atan item 0  vect item 1 vect
     report a
+  ]
 end
+
 
 to-report vectDirect
   let va multiplyScalarvect (factor-align * 4) vectAlign
   let vs multiplyScalarvect factor-separate vectSeparate
   let vc multiplyScalarvect (factor-cohere * 4) vectCohere
+  let vo multiplyScalarvect (factor-obstacles * 4) vectObstacles
 
   let vr additionvect va vc
   set vr additionvect vr vs
+  set vr additionvect vr vo
   report vr
 ;
 end
@@ -462,6 +489,22 @@ to-report vectSeparate
       [set vs list 0 0]
       [set vs VectFromAngle (towards nearest-neighbor + 180 ) (1 / distance nearest-neighbor)]
   report vs
+end
+
+to-report vectObstacles
+  let vo (list 0 0)
+  if any? obstacles [
+    let nearest-patch min-one-of obstacles [distance myself]
+    let d distance nearest-patch
+    set vo VectFromAngle ((towards nearest-patch) + 180) (1 / d)
+  ]
+  report vo
+
+end
+
+to-report vectWithObstacles
+  let vo multiplyScalarvect factor-obstacles vectObstacles
+  report vo
 end
 
 ;to separate  ;; turtle procedure
@@ -599,7 +642,7 @@ nb-water
 nb-water
 1
 10
-8.0
+4.0
 1
 1
 NIL
@@ -710,7 +753,7 @@ factor-align
 factor-align
 0
 1
-1.0
+0.7
 0.1
 1
 NIL
@@ -763,6 +806,21 @@ false
 "" ""
 PENS
 "default" 1.0 0 -16777216 true "" "plot global-hunger"
+
+SLIDER
+1036
+167
+1208
+200
+factor-obstacles
+factor-obstacles
+0
+1
+0.5
+0.1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
