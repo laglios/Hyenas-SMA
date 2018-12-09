@@ -1,5 +1,5 @@
 globals[lair-x lair-y spd-walk spd-run global-hunger feeding-rate
-  timer-body
+  timer-body size-hyena
   max-angle-turn vision];;flocking var
 patches-own [ground savane water rocky lair meat
   timerp-1 timerp-2]
@@ -33,6 +33,7 @@ to setup
   set spd-walk 0.1
   set spd-run 0.3
   set feeding-rate 0.005
+  set size-hyena 5
 
   ;;----init world----
   repeat nb-water [init-water]
@@ -79,7 +80,7 @@ to init-hyenas
   set age 1
   set rank random 5
   set strength 10 + random 50
-  set size 4 - (2 - (strength / 60) * 2)
+  set size 5 + size-hyena - (2 - (strength / 60) * 2)
   set m-called nobody
   ifelse rank = 0 [set color blue][set color pink]
   let continue 1
@@ -97,13 +98,12 @@ end
 to init-matriach
   set color red
   set shape "wolf 7"
-  set size 3
+  set size size-hyena + 6
   set hunger 100
   set life 100
   set age 1
   set rank 5
   set strength 60
-  set size 4
   set m-called nobody
   set target nobody
   setxy lair-x lair-y
@@ -402,7 +402,7 @@ to flee
     let d min-one-of dangers [distance myself]
     face d
     rt 180
-    fd spd-run
+    fd spd-run * 0.4
   ]
 end
 
@@ -794,7 +794,7 @@ PLOT
 247
 1233
 397
-Global Hunger
+Global Repletion
 NIL
 NIL
 0.0
