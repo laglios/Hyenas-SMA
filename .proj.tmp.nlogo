@@ -397,18 +397,23 @@ to update-preys
 end
 
 to flee
-  if any? dangers
-  [
-    set panic panic + 1
-    let d min-one-of dangers [distance myself]
-    face d
-    rt 180
-    fd spd-run * 0.4
-    if panic > panic-threshold
-    [
+  ifelse panic > panic-threshold [
       rt random 180
       lt random 180
       fd spd-run * 0.4
+
+  ]
+  [
+    ifels any? dangers
+    [
+      set panic panic + 1
+      let d min-one-of dangers [distance myself]
+      face d
+      rt 180
+      fd spd-run * 0.4
+    ]
+    [
+      set panic panic - 1
     ]
   ]
 end
