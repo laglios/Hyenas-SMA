@@ -1,6 +1,6 @@
 globals[lair-x lair-y spd-walk spd-run global-hunger feeding-rate
   timer-body size-hyena
-  max-angle-turn vision];;flocking var
+  max-angle-turn vision hungry];;flocking var
 patches-own [ground savane water rocky lair meat
   timerp-1 timerp-2]
 
@@ -43,8 +43,12 @@ to setup
   init-diffuse-lair
 
   ;;----init hyenas----
-  create-hyenas nb-hyenas [
-    init-hyenas
+  let rk 4
+  repeat 5[
+    create-hyenas nb-hyenas / 5 [
+      init-hyenas rk
+    ]
+    set rk rk - 1
   ]
   create-hyenas 1[
    init-matriach
@@ -73,16 +77,17 @@ end
 ;;-------------------init and display----------------------
 ;;---------------------------------------------------------
 
-to init-hyenas
+to init-hyenas [rk]
   set shape "wolf 7"
-  set hunger 60 + random 40
+  set hunger 100
   set life 100
   set age 1
-  set rank random 5
+  set rank rk
   set label rank
   set strength 10 + random 50
   set size 5 + size-hyena - (2 - (strength / 60) * 2)
   set m-called nobody
+  set hungry 0
   ifelse rank = 0 [set color blue][set color pink]
   let continue 1
   set target nobody
@@ -232,6 +237,8 @@ to go
     set global-hunger mean [hunger] of hyenas
   ]
   ;;corpse-generator
+  let cnt count preys
+  if(cnt < initial-prey * 10) [spawn-prey]
 
   update-plots
 end
@@ -262,8 +269,8 @@ to IA-hyenas
   ifelse surrounding > 0 [predator-interract surrounding]
   [ifelse t-called = 1 [defend-territory]
     [if(m-called = nobody) [set m-called min-one-of patches in-radius 20 with [meat > 0] [distance myself]]
-      ifelse (hunger < hunger-threshold - 20 and m-called != nobody)[eat-meat]
-      [ifelse (hunger < hunger-threshold - 20 or global-hunger < hunger-threshold) [hunt]
+      ifelse (hungry = 1 and m-called != nobody)[eat-meat]
+      [ifelse (hungry = 1 or global-hunger < hunger-threshold) [hunt]
         [set surrounding min-one-of hyenas in-radius 5 with [age = 0] [distance myself]
           ifelse surrounding != nobody [feed surrounding]
           [ifelse heat > heat-threshold [reproduce]
@@ -278,12 +285,12 @@ end
 
 to update-hyenas
   set hunger hunger - feeding-rate
-  set heat heat + feeding-rate
+  ;;set heat heat + feeding-rate
   ifelse(timer-att > 0)[set timer-att timer-att - 1]
   [set timer-att 0]
   if hunger < 1 [set life life - 1]
-  ifelse(timer2 > 25) [set timer2 0]
-  [set timer2 (timer2 + 1)]
+  ifelse hunger < hunger-threshold [ set hungry 1]
+  [if hunger > hunger-threshold + (hunger-threshold * 0.10) [set hungry 0]]
 end
 
 to predator-interract [surronding]
@@ -306,9 +313,9 @@ to eat-meat ;;hierarchi order
       [
         set surrounding count other hyenas in-radius 10 with [hunger < hunger-threshold and rank > [rank] of myself and strength > [strength] of myself]
       ]
-      ifelse surrounding < 4 and timer2 = 25[
+      ifelse surrounding < 4[
         ask m-called [ set meat meat - 5 if(meat < 1) [set meat 0 display-ground]]
-        set hunger hunger + 5
+        set hunger hunger + 2
       ][;;wait in line
         fiddle
       ]
@@ -405,23 +412,24 @@ to find-predators
 end
 
 to update-preys
+  let base-meat 600
   find-obstacles
   find-predators
   set thirt thirt - feeding-rate
   if(life < 1)[
-     ask patch xcor ycor [set meat 250 display-ground]
-    if(random 2 = 0) [ ask patch (xcor + 1) ycor [set meat 50 display-ground] ]
-    if(random 2 = 0) [ ask patch (xcor - 1) ycor [set meat 50 display-ground] ]
-    if(random 2 = 0) [ ask patch xcor (ycor + 1) [set meat 50 display-ground] ]
-    if(random 2 = 0) [ ask patch xcor (ycor - 1) [set meat 50 display-ground] ]
+     ask patch xcor ycor [set meat base-meat display-ground]
+    if(random 2 = 0) [ ask patch (xcor + 1) ycor [set meat (base-meat / 5)  display-ground] ]
+    if(random 2 = 0) [ ask patch (xcor - 1) ycor [set meat (base-meat / 5) display-ground] ]
+    if(random 2 = 0) [ ask patch xcor (ycor + 1) [set meat (base-meat / 5) display-ground] ]
+    if(random 2 = 0) [ ask patch xcor (ycor - 1) [set meat (base-meat / 5) display-ground] ]
     die
   ]
 end
 
 to flee
   ifelse panic > panic-threshold [
-      rt random 180
-      lt random 180
+      rt random 45
+      lt random 45
       fd spd-run * 0.4
 
   ]
@@ -439,8 +447,8 @@ end
 
 to IA-preys
   find-predators
-  flee
   flock
+  flee
   update-preys
 end
 
@@ -467,8 +475,12 @@ to erase-hyenas
 end
 
 to spawn-hyenas
-  create-hyenas nb-hyenas [
-    init-hyenas
+  let rk 4
+  repeat 5[
+    create-hyenas nb-hyenas / 5 [
+      init-hyenas rk
+    ]
+    set rk rk - 1
   ]
   create-hyenas 1[
    init-matriach
@@ -477,7 +489,7 @@ end
 
 to spawn-prey
   let xx random-xcor
-    let yy random-ycor
+  let yy random-ycor
     create-preys 5 + random 10[
       init-prey xx yy
     ]
@@ -713,7 +725,7 @@ hunger-threshold
 hunger-threshold
 0
 100
-100.0
+92.0
 1
 1
 NIL
@@ -728,7 +740,7 @@ heat-threshold
 heat-threshold
 0
 100
-50.0
+42.0
 1
 1
 NIL
@@ -870,7 +882,7 @@ panic-threshold
 panic-threshold
 50
 300
-225.0
+72.0
 1
 1
 NIL
