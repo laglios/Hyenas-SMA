@@ -79,6 +79,7 @@ to init-hyenas
   set life 100
   set age 1
   set rank random 5
+  set label rank
   set strength 10 + random 50
   set size 5 + size-hyena - (2 - (strength / 60) * 2)
   set m-called nobody
@@ -103,6 +104,7 @@ to init-matriach
   set life 100
   set age 1
   set rank 5
+  set label rank
   set strength 60
   set m-called nobody
   set target nobody
@@ -242,6 +244,15 @@ to corpse-generator
   [set timer-body timer-body - 1  ]
 end
 
+to-report mean-hyenas [rang]
+  let s sum [hunger] of hyenas with [rank = rang]
+  report s / count hyenas with [rank = rang]
+end
+
+to-report plot-strength [maxi mini]
+  report mean [hunger] of hyenas with [strength < maxi + 1 and strength > mini]
+end
+
 ;;---------------------------------------------------
 ;;---------------------IA Hyanas---------------------
 ;;---------------------------------------------------
@@ -250,7 +261,7 @@ to IA-hyenas
   let surrounding count predators in-radius 10
   ifelse surrounding > 0 [predator-interract surrounding]
   [ifelse t-called = 1 [defend-territory]
-    [if(m-called = nobody) [set m-called min-one-of patches in-radius 10 with [meat > 0] [distance myself]]
+    [if(m-called = nobody) [set m-called min-one-of patches in-radius 20 with [meat > 0] [distance myself]]
       ifelse (hunger < hunger-threshold - 20 and m-called != nobody)[eat-meat]
       [ifelse (hunger < hunger-threshold - 20 or global-hunger < hunger-threshold) [hunt]
         [set surrounding min-one-of hyenas in-radius 5 with [age = 0] [distance myself]
@@ -271,6 +282,8 @@ to update-hyenas
   ifelse(timer-att > 0)[set timer-att timer-att - 1]
   [set timer-att 0]
   if hunger < 1 [set life life - 1]
+  ifelse(timer2 > 25) [set timer2 0]
+  [set timer2 (timer2 + 1)]
 end
 
 to predator-interract [surronding]
@@ -293,7 +306,7 @@ to eat-meat ;;hierarchi order
       [
         set surrounding count other hyenas in-radius 10 with [hunger < hunger-threshold and rank > [rank] of myself and strength > [strength] of myself]
       ]
-      ifelse surrounding < 1[
+      ifelse surrounding < 4 and timer2 = 25[
         ask m-called [ set meat meat - 5 if(meat < 1) [set meat 0 display-ground]]
         set hunger hunger + 5
       ][;;wait in line
@@ -396,7 +409,12 @@ to update-preys
   find-predators
   set thirt thirt - feeding-rate
   if(life < 1)[
-    ask patch xcor ycor [set meat 60 display-ground] die
+     ask patch xcor ycor [set meat 250 display-ground]
+    if(random 2 = 0) [ ask patch (xcor + 1) ycor [set meat 50 display-ground] ]
+    if(random 2 = 0) [ ask patch (xcor - 1) ycor [set meat 50 display-ground] ]
+    if(random 2 = 0) [ ask patch xcor (ycor + 1) [set meat 50 display-ground] ]
+    if(random 2 = 0) [ ask patch xcor (ycor - 1) [set meat 50 display-ground] ]
+    die
   ]
 end
 
@@ -455,6 +473,14 @@ to spawn-hyenas
   create-hyenas 1[
    init-matriach
   ]
+end
+
+to spawn-prey
+  let xx random-xcor
+    let yy random-ycor
+    create-preys 5 + random 10[
+      init-prey xx yy
+    ]
 end
 
 ;;-----------------------------------------------
@@ -861,6 +887,68 @@ rank-influence
 1
 -1000
 
+PLOT
+6
+504
+674
+773
+By Rank
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+true
+"" ""
+PENS
+"Matriarch" 1.0 0 -10873583 true "" "plot mean-hyenas 5"
+"Rank 4" 1.0 0 -2674135 true "" "plot mean-hyenas 4"
+"Rank 3" 1.0 0 -1604481 true "" "plot mean-hyenas 3"
+"Rank 2" 1.0 0 -534828 true "" "plot mean-hyenas 2"
+"Rank 1" 1.0 0 -5516827 true "" "plot mean-hyenas 1"
+"Male" 1.0 0 -13345367 true "" "plot mean-hyenas 0"
+
+PLOT
+681
+504
+1247
+769
+By Strenght
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+true
+"" ""
+PENS
+"60-50" 1.0 0 -10873583 true "" "plot plot-strength 60 50"
+"50-40" 1.0 0 -2674135 true "" "plot plot-strength 50 40"
+"40-30" 1.0 0 -1604481 true "" "plot plot-strength 40 30"
+"30-20" 1.0 0 -13403783 true "" "plot plot-strength 30 20"
+"20-10" 1.0 0 -13791810 true "" "plot plot-strength 20 0"
+
+BUTTON
+1261
+15
+1374
+48
+NIL
+spawn-prey
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
 @#$#@#$#@
 ## WHAT IS IT?
 
@@ -1225,7 +1313,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 6.0.3
+NetLogo 6.0.4
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
