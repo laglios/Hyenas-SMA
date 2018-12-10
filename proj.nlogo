@@ -288,7 +288,11 @@ to eat-meat ;;hierarchi order
     ask hyenas [if m-called = nobody [set m-called yippy] ]
     ifelse(distance m-called < 1)[;;close test
       set debug "eating"
-      let surrounding count other hyenas in-radius 10 with [hunger < hunger-threshold and rank > [rank] of myself and strength > [strength] of myself]
+      let surrounding 0
+      if rank-influence
+      [
+        set surrounding count other hyenas in-radius 10 with [hunger < hunger-threshold and rank > [rank] of myself and strength > [strength] of myself]
+      ]
       ifelse surrounding < 1[
         ask m-called [ set meat meat - 5 if(meat < 1) [set meat 0 display-ground]]
         set hunger hunger + 5
@@ -397,17 +401,19 @@ to update-preys
 end
 
 to flee
-  if any? dangers
-  [
-    set panic panic + 1
-    let d min-one-of dangers [distance myself]
-    face d
-    rt 180
-    fd spd-run * 0.4
-    if panic > panic-threshold
-    [
+  ifelse panic > panic-threshold [
       rt random 180
       lt random 180
+      fd spd-run * 0.4
+
+  ]
+  [
+    if any? dangers
+    [
+      set panic panic + 1
+      let d min-one-of dangers [distance myself]
+      face d
+      rt 180
       fd spd-run * 0.4
     ]
   ]
@@ -838,11 +844,22 @@ panic-threshold
 panic-threshold
 50
 300
-100.0
+225.0
 1
 1
 NIL
 HORIZONTAL
+
+SWITCH
+8
+321
+167
+354
+rank-influence
+rank-influence
+0
+1
+-1000
 
 @#$#@#$#@
 ## WHAT IS IT?
