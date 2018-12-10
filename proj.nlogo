@@ -1,6 +1,6 @@
 globals[lair-x lair-y spd-walk spd-run global-hunger feeding-rate
   timer-body size-hyena
-  max-angle-turn vision hungry];;flocking var
+  max-angle-turn vision];;flocking var
 patches-own [ground savane water rocky lair meat
   timerp-1 timerp-2]
 
@@ -9,7 +9,7 @@ patches-own [ground savane water rocky lair meat
 ;;--------------------------
 breed[hyenas hyena]
 hyenas-own [debug
-  age rank strength hunger target t-called m-called heat life
+  age rank strength hunger target t-called m-called heat life hungry
   timer1 timer2 timer-R timer-att
 ]
 
@@ -87,7 +87,7 @@ to init-hyenas [rk]
   set strength 10 + random 50
   set size 5 + size-hyena - (2 - (strength / 60) * 2)
   set m-called nobody
-  set hungry 0
+  set hungry false
   ifelse rank = 0 [set color blue][set color pink]
   let continue 1
   set target nobody
@@ -109,6 +109,7 @@ to init-matriach
   set life 100
   set age 1
   set rank 5
+  set hungry false
   set label rank
   set strength 60
   set m-called nobody
@@ -252,8 +253,7 @@ to corpse-generator
 end
 
 to-report mean-hyenas [rang]
-  let s sum [hunger] of hyenas with [rank = rang]
-  report s / count hyenas with [rank = rang]
+  report mean [hunger] of hyenas with [rank = rang]
 end
 
 to-report plot-strength [maxi mini]
@@ -269,8 +269,8 @@ to IA-hyenas
   ifelse surrounding > 0 [predator-interract surrounding]
   [ifelse t-called = 1 [defend-territory]
     [if(m-called = nobody) [set m-called min-one-of patches in-radius 20 with [meat > 0] [distance myself]]
-      ifelse (hungry = 1 and m-called != nobody)[eat-meat]
-      [ifelse (hungry = 1 or global-hunger < hunger-threshold) [hunt]
+      ifelse (hungry = true and m-called != nobody)[eat-meat]
+      [ifelse (hungry = true or global-hunger < hunger-threshold) [hunt]
         [set surrounding min-one-of hyenas in-radius 5 with [age = 0] [distance myself]
           ifelse surrounding != nobody [feed surrounding]
           [ifelse heat > heat-threshold [reproduce]
@@ -285,12 +285,12 @@ end
 
 to update-hyenas
   set hunger hunger - feeding-rate
+  ifelse hunger < hunger-threshold [ set hungry true]
+  [if hunger > hunger-threshold + (hunger-threshold * 0.10) [set hungry false]]
   ;;set heat heat + feeding-rate
   ifelse(timer-att > 0)[set timer-att timer-att - 1]
   [set timer-att 0]
   if hunger < 1 [set life life - 1]
-  ifelse hunger < hunger-threshold [ set hungry 1]
-  [if hunger > hunger-threshold + (hunger-threshold * 0.10) [set hungry 0]]
 end
 
 to predator-interract [surronding]
@@ -315,7 +315,7 @@ to eat-meat ;;hierarchi order
       ]
       ifelse surrounding < 4[
         ask m-called [ set meat meat - 5 if(meat < 1) [set meat 0 display-ground]]
-        set hunger hunger + 2
+        set hunger hunger + 0.25
       ][;;wait in line
         fiddle
       ]
@@ -330,9 +330,9 @@ end
 to hunt
   set debug "hunt"
   ifelse target = nobody [ ;; no previous target
-    set target min-one-of preys in-radius 10 [distance myself]
+    set target min-one-of preys in-radius 15 [distance myself]
     ifelse(target != nobody)[;;target found
-      let number count preys in-radius 15
+      let number count preys in-radius 7
       ifelse(number > 3)[ ;; if in pack
         ifelse(distance target > 7)[;; if too far
           face target fd spd-walk
@@ -408,7 +408,7 @@ to find-obstacles
 end
 
 to find-predators
-  set dangers hyenas in-cone 9 60
+  set dangers hyenas in-radius 10
 end
 
 to update-preys
@@ -725,7 +725,7 @@ hunger-threshold
 hunger-threshold
 0
 100
-92.0
+100.0
 1
 1
 NIL
@@ -882,7 +882,7 @@ panic-threshold
 panic-threshold
 50
 300
-72.0
+50.0
 1
 1
 NIL
