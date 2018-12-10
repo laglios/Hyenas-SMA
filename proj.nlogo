@@ -239,7 +239,7 @@ to go
   ]
   ;;corpse-generator
   let cnt count preys
-  if(cnt < initial-prey * 10) [spawn-prey]
+  if(respawn and cnt < initial-prey * 10) [spawn-prey]
 
   update-plots
 end
@@ -311,11 +311,11 @@ to eat-meat ;;hierarchi order
       let surrounding 0
       if rank-influence
       [
-        set surrounding count other hyenas in-radius 10 with [hunger < hunger-threshold and rank > [rank] of myself and strength > [strength] of myself]
+        set surrounding count other hyenas in-radius 15 with [hunger < hunger-threshold and rank > [rank] of myself and strength > [strength] of myself]
       ]
       ifelse surrounding < 4[
         ask m-called [ set meat meat - 5 if(meat < 1) [set meat 0 display-ground]]
-        set hunger hunger + 0.25
+        set hunger hunger + 0.05
       ][;;wait in line
         fiddle
       ]
@@ -412,7 +412,7 @@ to find-predators
 end
 
 to update-preys
-  let base-meat 600
+  let base-meat 5500
   find-obstacles
   find-predators
   set thirt thirt - feeding-rate
@@ -678,7 +678,7 @@ nb-hyenas
 nb-hyenas
 0
 30
-12.0
+30.0
 1
 1
 NIL
@@ -927,7 +927,7 @@ PLOT
 504
 1247
 769
-By Strenght
+By Strength
 NIL
 NIL
 0.0
@@ -960,6 +960,17 @@ NIL
 NIL
 NIL
 1
+
+SWITCH
+1238
+57
+1359
+90
+Respawn
+Respawn
+0
+1
+-1000
 
 @#$#@#$#@
 ## WHAT IS IT?
