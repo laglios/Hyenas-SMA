@@ -207,7 +207,7 @@ to init-lair
 end
 
 to display-ground
-  ifelse(meat = 0)[
+  ifelse(meat < 1)[
     ifelse(lair > 0.2) [
     set pcolor scale-color brown lair  0 1
     ]
