@@ -302,6 +302,8 @@ to defend-territory
 end
 
 to eat-meat ;;hierarchi order
+  let o  min-one-of patches in-radius 20 with [meat > 0] [distance myself]
+  if (o != nobody and distance m-called > distance o) [set m-called o]
   ifelse (([meat] of m-called) = 0) [set debug "no" set m-called nobody]
   [;;if there is still meat
     let yippy m-called
@@ -321,7 +323,7 @@ to eat-meat ;;hierarchi order
       ]
     ][;; if too far
       set debug "closing distance"
-      face m-called fd spd-walk
+      face m-called fd getSpeed 0
     ]
   ]
 
@@ -329,23 +331,24 @@ end
 
 to hunt
   set debug "hunt"
+  ;;set label ((word rank) + ":hunt")
   ifelse target = nobody [ ;; no previous target
     set target min-one-of preys in-radius 15 [distance myself]
     ifelse(target != nobody)[;;target found
       let number count preys in-radius 7
       ifelse(number > 3)[ ;; if in pack
         ifelse(distance target > 7)[;; if too far
-          face target fd spd-walk
+          face target fd getSpeed 0
         ][;; if too close
-          face target rt 180 fd spd-walk
+          face target rt 180 fd getSpeed 0
         ]
       ][;;if alone
-        if(target != nobody)[face target fd spd-run]
+        if(target != nobody)[face target fd getSpeed 1]
       ]
     ][;;no target
       rt random 15
       lt random 15
-      fd spd-walk
+      fd getSpeed 0
     ]
   ][;;follow previous target
     ifelse((distance target) < 2.5) [;;in reach to attack
@@ -357,17 +360,17 @@ to hunt
       let number count preys in-radius 15
       ifelse(number > 3)[ ;; if in pack
         ifelse(distance target > 13)[;; if too far
-          face target fd spd-walk
+          face target fd getSpeed 0
         ][;; if too close
           let nei min-one-of other hyenas in-radius 5 [distance myself] ;;neighbor
           ifelse(nei != nobody)[;;if ally close
-            face nei rt 180 fd spd-walk
+            face nei rt 180 fd getSpeed 0
           ][;;if close and no ally
-            face target rt 90 fd spd-walk
+            face target rt 90 fd getSpeed 0
           ]
         ]
       ][;;if alone
-        if(target != nobody)[face target fd spd-run]
+        if(target != nobody)[face target fd getSpeed 1]
       ]
     ]
   ]
@@ -391,12 +394,23 @@ to frolic
     rt random 90
     lt random 90
   ]
-  fd spd-walk
+  fd getSpeed 0
 end
 
 to fiddle
   rt random 180
   lt random 180
+end
+
+to-report getSpeed [i]
+  ifelse i = 0 [report spd-walk * coef]
+  [report spd-run * ((strength + 40) / 50) * coef]
+end
+
+to-report coef
+  let c (100 ^ (hunger / hunger-threshold)) / 100
+  ifelse(c < 0.75) [report 0.75]
+  [report c]
 end
 
 ;;---------------------------------------------------
@@ -968,7 +982,7 @@ SWITCH
 90
 Respawn
 Respawn
-0
+1
 1
 -1000
 
